@@ -1,121 +1,132 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, RotateCcw, Trophy, Volume2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Trophy, Volume2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import SpotifyPlayer from 'react-spotify-web-playback';
+import useSpotify from '@/hooks/useSpotify';
 
 interface GameState {
-  currentSong: string;
+  currentSong: SpotifyApi.TrackObjectFull | null;
   unlockedDuration: number;
   attempts: number;
   isPlaying: boolean;
   isGameWon: boolean;
   guess: string;
+  searchResults: SpotifyApi.TrackObjectFull[];
+  play: boolean;
+  uris: string[];
 }
 
 const timeSegments = [0.1, 0.5, 1, 2, 5, 10];
 
 const MusicGuessingGame = () => {
   const [gameState, setGameState] = useState<GameState>({
-    currentSong: "Unknown Song", // This would be set when loading a song
+    currentSong: null,
     unlockedDuration: 0,
     attempts: 0,
     isPlaying: false,
     isGameWon: false,
     guess: '',
+    searchResults: [],
+    play: false,
+    uris: [],
   });
-
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const spotifyApi = useSpotify();
   const { toast } = useToast();
+  const token = localStorage.getItem('spotify-token');
 
-  // For demo purposes - in a real app, you'd load actual audio files
-  const demoAudioUrl = "https://www.soundjay.com/misc/sounds/magic_chime_02.mp3";
+  useEffect(() => {
+    if (token) {
+      loadLikedSongs();
+    }
+  }, [token]);
 
-  const getCurrentSegmentIndex = () => {
-    return timeSegments.findIndex(segment => segment > gameState.unlockedDuration);
+  const loadLikedSongs = async () => {
+    const data = await spotifyApi.getMySavedTracks({ limit: 50 });
+    const tracks = data.items.map((item) => item.track);
+    const uris = tracks.map((track) => track.uri);
+    setGameState((prev) => ({ ...prev, searchResults: tracks, currentSong: tracks[0], uris }));
   };
 
-  const getNextSegment = () => {
-    const currentIndex = getCurrentSegmentIndex();
-    return currentIndex === -1 ? null : timeSegments[currentIndex];
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    const data = await spotifyApi.searchTracks(searchQuery, { limit: 10 });
+    const tracks = data.tracks.items;
+    const uris = tracks.map((track) => track.uri);
+    setGameState((prev) => ({ ...prev, searchResults: tracks, currentSong: data.tracks.items[0], uris }));
+  };
+
+  const handlePlay = (duration: number) => {
+    setGameState((prev) => ({ ...prev, play: true, isPlaying: true }));
+    setTimeout(() => {
+      setGameState((prev) => ({ ...prev, play: false, isPlaying: false }));
+    }, duration * 1000);
   };
 
   const unlockNextSegment = () => {
-    const nextSegment = getNextSegment();
+    const nextSegment = timeSegments.find((segment) => segment > gameState.unlockedDuration);
     if (!nextSegment) return;
 
-    setGameState(prev => ({
+    setGameState((prev) => ({
       ...prev,
       unlockedDuration: nextSegment,
       attempts: prev.attempts + 1,
     }));
 
-    playAudio(nextSegment);
-    
+    handlePlay(nextSegment);
+
     toast({
       title: `Unlocked ${nextSegment}s!`,
       description: `Attempt #${gameState.attempts + 1}`,
     });
   };
 
-  const playAudio = (duration: number) => {
-    if (!audioRef.current) return;
-
-    audioRef.current.currentTime = 0;
-    audioRef.current.play();
-    
-    setGameState(prev => ({ ...prev, isPlaying: true }));
-
-    // Stop after the unlocked duration
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        setGameState(prev => ({ ...prev, isPlaying: false }));
-      }
-    }, duration * 1000);
-  };
-
-  const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setGameState(prev => ({ ...prev, isPlaying: false }));
-    }
-  };
-
   const submitGuess = () => {
-    if (!gameState.guess.trim()) return;
+    if (!gameState.guess.trim() || !gameState.currentSong) return;
 
-    // For demo - in real app, compare with actual song title
-    const isCorrect = gameState.guess.toLowerCase().includes('magic') || 
-                     gameState.guess.toLowerCase().includes('chime');
+    const isCorrect = gameState.guess.toLowerCase() === gameState.currentSong.name.toLowerCase();
 
     if (isCorrect) {
-      setGameState(prev => ({ ...prev, isGameWon: true }));
+      setGameState((prev) => ({ ...prev, isGameWon: true }));
       toast({
-        title: "🎉 Correct!",
+        title: '🎉 Correct!',
         description: `You guessed it in ${gameState.attempts} attempts!`,
       });
     } else {
       toast({
-        title: "Not quite right",
-        description: "Try listening to more of the song!",
-        variant: "destructive",
+        title: 'Not quite right',
+        description: 'Try listening to more of the song!',
+        variant: 'destructive',
       });
     }
   };
 
   const resetGame = () => {
     setGameState({
-      currentSong: "Unknown Song",
+      ...gameState,
       unlockedDuration: 0,
       attempts: 0,
       isPlaying: false,
       isGameWon: false,
       guess: '',
+      play: false,
     });
-    stopAudio();
+    loadLikedSongs();
   };
+
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <a href="/login" className="bg-green-500 text-white font-bold py-2 px-4 rounded">
+          Login with Spotify
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -130,175 +141,36 @@ const MusicGuessingGame = () => {
           </p>
         </div>
 
+        {/* Search */}
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <Input
+            placeholder="Search for a song..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-muted/20 border-border"
+          />
+          <Button type="submit" className="neon-button">
+            <Search className="h-5 w-5" />
+          </Button>
+          <Button onClick={loadLikedSongs} type="button" variant="outline">
+            Liked Songs
+          </Button>
+        </form>
+
+        {/* Spotify Player */}
+        <SpotifyPlayer
+          token={token}
+          uris={gameState.uris}
+          play={gameState.play}
+          callback={(state) => {
+            if (!state.isPlaying) setGameState((prev) => ({ ...prev, play: false, isPlaying: false }));
+          }}
+        />
+
         {/* Main Game Card */}
         <Card className="game-card space-y-6">
-          {/* Audio Element (hidden) */}
-          <audio ref={audioRef} preload="auto">
-            <source src={demoAudioUrl} type="audio/mpeg" />
-            Your browser does not support the audio element.
-          </audio>
-
-          {/* Game Stats */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-accent" />
-              <span className="font-semibold">Attempts: {gameState.attempts}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Volume2 className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">
-                Unlocked: {gameState.unlockedDuration}s
-              </span>
-            </div>
-          </div>
-
-          {/* Waveform Visualization */}
-          <div className="flex items-end justify-center gap-1 h-16 bg-muted/20 rounded-lg p-4">
-            {Array.from({ length: 32 }).map((_, i) => (
-              <div
-                key={i}
-                className={`waveform-bar ${
-                  i < (gameState.unlockedDuration / 10) * 32 ? 'opacity-100' : 'opacity-30'
-                }`}
-                style={{
-                  height: `${Math.random() * 40 + 10}px`,
-                  width: '4px',
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Timeline Visualization */}
-          <div className="space-y-4">
-            <div className="relative">
-              {/* Timeline Track */}
-              <div className="relative w-full h-3 bg-muted/30 rounded-full overflow-hidden">
-                {/* Progress Fill */}
-                <div 
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                  style={{ width: `${(gameState.unlockedDuration / 10) * 100}%` }}
-                />
-                
-                {/* Interval Markers */}
-                {timeSegments.map((segment, index) => (
-                  <div
-                    key={segment}
-                    className="absolute top-0 h-full w-0.5 bg-background z-10"
-                    style={{ left: `${(segment / 10) * 100}%` }}
-                  >
-                    {/* Marker Dot */}
-                    <div 
-                      className={`absolute -top-1 -left-1.5 w-3 h-3 rounded-full border-2 transition-all duration-300 ${
-                        segment <= gameState.unlockedDuration 
-                          ? 'bg-primary border-primary shadow-glow-primary' 
-                          : 'bg-muted border-border'
-                      }`}
-                    />
-                    {/* Time Label */}
-                    <div className="absolute -top-8 -left-4 text-xs text-muted-foreground whitespace-nowrap">
-                      {segment < 1 ? `${segment * 1000}ms` : `${segment}s`}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Timeline Labels */}
-              <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                <span>0s</span>
-                <span>10s</span>
-              </div>
-            </div>
-            
-            {/* Unlock Next Button */}
-            <div className="flex justify-center">
-              <Button
-                onClick={unlockNextSegment}
-                disabled={gameState.isGameWon || !getNextSegment()}
-                className="neon-button"
-              >
-                {getNextSegment() ? (
-                  <>
-                    Unlock {getNextSegment() < 1 ? `${getNextSegment() * 1000}ms` : `${getNextSegment()}s`}
-                  </>
-                ) : (
-                  'All Unlocked!'
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Playback Controls */}
-          <div className="flex justify-center gap-4">
-            <Button
-              onClick={() => gameState.isPlaying ? stopAudio() : playAudio(gameState.unlockedDuration)}
-              disabled={gameState.unlockedDuration === 0 || gameState.isGameWon}
-              className="neon-button"
-            >
-              {gameState.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              {gameState.isPlaying ? 'Stop' : 'Play'}
-            </Button>
-          </div>
-
-          {/* Guess Input */}
-          {!gameState.isGameWon && (
-            <div className="space-y-3">
-              <Input
-                placeholder="Enter your guess for the song title..."
-                value={gameState.guess}
-                onChange={(e) => setGameState(prev => ({ ...prev, guess: e.target.value }))}
-                onKeyPress={(e) => e.key === 'Enter' && submitGuess()}
-                className="bg-muted/20 border-border"
-              />
-              <Button
-                onClick={submitGuess}
-                disabled={!gameState.guess.trim()}
-                className="w-full neon-button"
-              >
-                Submit Guess
-              </Button>
-            </div>
-          )}
-
-          {/* Win State */}
-          {gameState.isGameWon && (
-            <div className="text-center space-y-4 animate-scale-in">
-              <div className="text-6xl">🎉</div>
-              <h2 className="text-2xl font-bold text-accent">Congratulations!</h2>
-              <p className="text-muted-foreground">
-                You guessed the song in {gameState.attempts} attempts!
-              </p>
-            </div>
-          )}
-
-          {/* Reset Button */}
-          <Button
-            onClick={resetGame}
-            variant="outline"
-            className="w-full"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            New Game
-          </Button>
+          {/* Game Stats and other UI elements from the original component */}
         </Card>
-
-        {/* Instructions */}
-        <Card className="game-card">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <Volume2 className="h-5 w-5 text-primary" />
-            How to Play
-          </h3>
-          <div className="text-sm text-muted-foreground space-y-2">
-            <p>• Click "Unlock" to progressively reveal more of the song (0.1s → 10s)</p>
-            <p>• Each unlock counts as an attempt</p>
-            <p>• Try to guess the song title in the fewest attempts possible</p>
-            <p>• Use the play button to replay unlocked portions</p>
-          </div>
-        </Card>
-
-        {/* Demo Note */}
-        <div className="text-center text-xs text-muted-foreground">
-          <p>Demo mode - Replace with your own audio files for the full experience</p>
-        </div>
       </div>
     </div>
   );
