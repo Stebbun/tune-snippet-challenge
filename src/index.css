@@ -2,41 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Music Game Design System - Dark Theme with Neon Accents */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Dark Theme Base Colors */
+    --background: 222 84% 3%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 222 84% 4%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 222 84% 4%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Electric Blue Primary */
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 84% 3%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Deep Purple Secondary */
+    --secondary: 265 95% 25%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted Dark Tones */
+    --muted: 217 32% 15%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Neon Pink Accent */
+    --accent: 316 73% 52%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Game-specific Design Tokens */
+    --neon-blue: 217 91% 60%;
+    --neon-purple: 265 95% 52%;
+    --neon-pink: 316 73% 52%;
+    --dark-surface: 222 84% 4%;
+    --darker-surface: 222 84% 2%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(265 95% 52%));
+    --gradient-secondary: linear-gradient(135deg, hsl(265 95% 25%), hsl(316 73% 52%));
+    --gradient-dark: linear-gradient(135deg, hsl(222 84% 2%), hsl(222 84% 4%));
+    
+    /* Shadows & Glows */
+    --glow-primary: 0 0 40px hsl(217 91% 60% / 0.3);
+    --glow-accent: 0 0 30px hsl(316 73% 52% / 0.2);
+    --shadow-elevated: 0 20px 40px hsl(222 84% 1% / 0.8);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +125,68 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    background: var(--gradient-dark);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* Game UI Components */
+  .game-card {
+    @apply bg-card border border-border rounded-xl p-6;
+    background: var(--gradient-dark);
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .neon-button {
+    @apply relative overflow-hidden rounded-lg px-6 py-3 font-semibold transition-all duration-300;
+    background: var(--gradient-primary);
+    box-shadow: var(--glow-primary);
+    transform: perspective(1px);
+  }
+  
+  .neon-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--glow-primary), 0 10px 30px hsl(217 91% 60% / 0.4);
+  }
+  
+  .neon-button:active {
+    transform: translateY(0);
+  }
+  
+  .unlock-button {
+    @apply relative rounded-lg px-4 py-3 font-medium transition-all duration-300;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+  }
+  
+  .unlock-button:not(:disabled):hover {
+    background: var(--gradient-secondary);
+    box-shadow: var(--glow-accent);
+    transform: translateY(-1px);
+  }
+  
+  .unlock-button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  
+  .waveform-bar {
+    @apply rounded-full transition-all duration-500;
+    background: var(--gradient-primary);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px hsl(217 91% 60% / 0.3); }
+    50% { box-shadow: 0 0 40px hsl(217 91% 60% / 0.6); }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  .floating {
+    animation: float 3s ease-in-out infinite;
   }
 }
