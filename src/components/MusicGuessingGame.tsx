@@ -32,23 +32,29 @@ const MusicGuessingGame = () => {
   // For demo purposes - in a real app, you'd load actual audio files
   const demoAudioUrl = "https://www.soundjay.com/misc/sounds/magic_chime_02.mp3";
 
-  const unlockSegment = (duration: number) => {
-    if (duration <= gameState.unlockedDuration) {
-      // Already unlocked, just play
-      playAudio(duration);
-      return;
-    }
+  const getCurrentSegmentIndex = () => {
+    return timeSegments.findIndex(segment => segment > gameState.unlockedDuration);
+  };
+
+  const getNextSegment = () => {
+    const currentIndex = getCurrentSegmentIndex();
+    return currentIndex === -1 ? null : timeSegments[currentIndex];
+  };
+
+  const unlockNextSegment = () => {
+    const nextSegment = getNextSegment();
+    if (!nextSegment) return;
 
     setGameState(prev => ({
       ...prev,
-      unlockedDuration: duration,
+      unlockedDuration: nextSegment,
       attempts: prev.attempts + 1,
     }));
 
-    playAudio(duration);
+    playAudio(nextSegment);
     
     toast({
-      title: `Unlocked ${duration}s!`,
+      title: `Unlocked ${nextSegment}s!`,
       description: `Attempt #${gameState.attempts + 1}`,
     });
   };
@@ -162,20 +168,63 @@ const MusicGuessingGame = () => {
             ))}
           </div>
 
-          {/* Unlock Buttons */}
-          <div className="grid grid-cols-3 gap-3">
-            {timeSegments.map((duration) => (
+          {/* Timeline Visualization */}
+          <div className="space-y-4">
+            <div className="relative">
+              {/* Timeline Track */}
+              <div className="relative w-full h-3 bg-muted/30 rounded-full overflow-hidden">
+                {/* Progress Fill */}
+                <div 
+                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                  style={{ width: `${(gameState.unlockedDuration / 10) * 100}%` }}
+                />
+                
+                {/* Interval Markers */}
+                {timeSegments.map((segment, index) => (
+                  <div
+                    key={segment}
+                    className="absolute top-0 h-full w-0.5 bg-background z-10"
+                    style={{ left: `${(segment / 10) * 100}%` }}
+                  >
+                    {/* Marker Dot */}
+                    <div 
+                      className={`absolute -top-1 -left-1.5 w-3 h-3 rounded-full border-2 transition-all duration-300 ${
+                        segment <= gameState.unlockedDuration 
+                          ? 'bg-primary border-primary shadow-glow-primary' 
+                          : 'bg-muted border-border'
+                      }`}
+                    />
+                    {/* Time Label */}
+                    <div className="absolute -top-8 -left-4 text-xs text-muted-foreground whitespace-nowrap">
+                      {segment < 1 ? `${segment * 1000}ms` : `${segment}s`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Timeline Labels */}
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                <span>0s</span>
+                <span>10s</span>
+              </div>
+            </div>
+            
+            {/* Unlock Next Button */}
+            <div className="flex justify-center">
               <Button
-                key={duration}
-                onClick={() => unlockSegment(duration)}
-                disabled={gameState.isGameWon}
-                className={`unlock-button ${
-                  duration <= gameState.unlockedDuration ? 'bg-gradient-to-r from-primary to-accent' : ''
-                }`}
+                onClick={unlockNextSegment}
+                disabled={gameState.isGameWon || !getNextSegment()}
+                className="neon-button"
               >
-                {duration < 1 ? `${duration * 1000}ms` : `${duration}s`}
+                {getNextSegment() ? (
+                  <>
+                    Unlock {getNextSegment() < 1 ? `${getNextSegment() * 1000}ms` : `${getNextSegment()}s`}
+                  </>
+                ) : (
+                  'All Unlocked!'
+                )}
               </Button>
-            ))}
+            </div>
           </div>
 
           {/* Playback Controls */}
@@ -239,7 +288,7 @@ const MusicGuessingGame = () => {
             How to Play
           </h3>
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>• Click time buttons to unlock more of the song (0.1s → 10s)</p>
+            <p>• Click "Unlock" to progressively reveal more of the song (0.1s → 10s)</p>
             <p>• Each unlock counts as an attempt</p>
             <p>• Try to guess the song title in the fewest attempts possible</p>
             <p>• Use the play button to replay unlocked portions</p>

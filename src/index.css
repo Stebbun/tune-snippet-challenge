@@ -189,4 +189,8 @@
   .floating {
     animation: float 3s ease-in-out infinite;
   }
+  
+  .shadow-glow-primary {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  }
 }
